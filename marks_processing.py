@@ -43,6 +43,9 @@ def add_grand_total(group):
 
 def process_marks(student_marks_data):
 
+    for idx, record in enumerate(student_marks_data):
+        record["__input_order"] = idx
+
 
     student_marks_df = pd.DataFrame(student_marks_data)
 
@@ -51,17 +54,19 @@ def process_marks(student_marks_data):
 
 
     all_columns = student_marks_df.columns.tolist()
-    non_common_colums = ['exam_name', 'subject_marks_dict', 'exam_total', 'percentage', 'exam_display_order', 'weightage', "exam_term"]
+    non_common_colums = ['exam_name', 'subject_marks_dict', 'exam_total', 'percentage', 
+                         'exam_display_order', 'weightage', "exam_term", '__input_order']
     common_columns = [col for col in all_columns if col not in non_common_colums]
 
 
     def exam_info_group(df):
-        df_sorted = df.sort_values('exam_display_order', na_position='last')
+        df_sorted = df.sort_values('__input_order', na_position='last')
         
         ordered_exams = OrderedDict()
         for _, row in df_sorted.iterrows():
+            subj_marks = OrderedDict(row['subject_marks_dict'])
             ordered_exams[row['exam_name']] = {
-                'subject_marks_dict': row['subject_marks_dict'],
+                'subject_marks_dict': subj_marks,
                 'exam_total': row['exam_total'],
                 'percentage': row['percentage'],
                 'weightage': row['weightage'],
@@ -70,10 +75,15 @@ def process_marks(student_marks_data):
         return ordered_exams
 
     student_marks_df = (
-            student_marks_df.groupby(common_columns)
+            student_marks_df.groupby(common_columns, sort=False)
             .apply(exam_info_group, include_groups=False)
             .reset_index(name="marks")
         )
+
+    # Restore students’ original input order
+    student_marks_df = student_marks_df.sort_values('__input_order')
+    student_marks_df = student_marks_df.drop(columns="__input_order")
+    
     student_marks = student_marks_df.to_dict(orient='records')
 
     return student_marks
